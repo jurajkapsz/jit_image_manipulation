@@ -77,7 +77,7 @@
 		/**
 		 * Given a path to an image, `$image`, this function will verify it's
 		 * existence, and generate a resource for use with PHP's image functions
-		 * based off the file's type (.gif, .jpg, .png).
+		 * based off the file's type (.gif, .jpg, .png, .webp).
 		 * Images must be RGB, CMYK jpg's are not supported due to GD limitations.
 		 *
 		 * @param string $image
@@ -118,8 +118,13 @@
 					$resource = imagecreatefrompng($image);
 					break;
 
+				// WEBP
+				case IMAGETYPE_WEBP:
+					$resource = imagecreatefromwebp($image);
+					break;
+
 				default:
-					throw new Exception('Unsupported image type. Supported types: GIF, JPEG and PNG');
+					throw new Exception('Unsupported image type. Supported types: GIF, JPEG, PNG and WEBP');
 					break;
 			}
 
@@ -422,6 +427,10 @@
 
 				case IMAGETYPE_PNG:
 					return imagepng($this->_resource, $dest, round(9 * ($quality * 0.01)));
+					break;
+
+				case IMAGETYPE_WEBP:
+					return imagewebp($this->_resource, $dest, $quality);
 					break;
 
 				case IMAGETYPE_JPEG:

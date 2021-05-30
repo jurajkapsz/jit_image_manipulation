@@ -16,8 +16,11 @@
 		</author>
 	</authors>
 	<releases>
+		<release version="1.47.2" date="2021-05-30" min="2.6.0" max="2.x.x">
+			- Generate WebP images on the fly
+		</release>
 		<release version="1.47.1" date="2021-05-13" min="2.6.0" max="2.x.x">
-			- Adds webp image support
+			- Add WebP image support
 		</release>
 		<release version="1.47" date="2018-01-15" min="2.6.0" max="2.x.x">
 			- Sanitize Widget's values

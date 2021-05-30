@@ -86,3 +86,23 @@ Recipes are named rules for the JIT settings which help improve security and are
 When JIT parses a URL like this, it will check the recipes file for a recipe with a handle of `thumbnail` and apply it's rules. You can completely disable dynamic JIT rules and choose to use recipes only which will prevent a malicious user from hammering your server with large or multiple JIT requests.
 
 Recipes can be copied between installations and changes will be reflected by every image using this recipe.
+
+## WebP please
+
+JIT offers to generate WebP images on the fly from common image file formats like jpeg and png. [WebP images](https://developers.google.com/speed/webp/) are designed for the web, offering better quality and significantly smaller file sizes, making websites with images loading faster and more SEO friendly.
+
+### Usage
+
+Just add `.webp` at the end of JIT URL requests described above, e.g.:
+
+	".../{image/filename}.webp"
+
+so the final URL will look something like:
+
+	".../image.jpg.webp"
+
+### More info
+
+* As of now, JIT WebP generation is not supported for external images.
+* It is recommended to have JIT images caching enabled, which is `on` by default (see `'image' => 'cache'` in `/manifest/config.php`; `1` - enabled, `0` - disabled). Generated WebP images are then stored along with other JIT images in the `/manifest/cache` folder.
+* See [WebP browser support](https://caniuse.com/?search=webp).

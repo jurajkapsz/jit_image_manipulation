@@ -42,7 +42,8 @@
 			'position' => 0,
 			'background' => 0,
 			'file' => 0,
-			'external' => false
+			'external' => false,
+			'to_webp' => '' // When populated, we know we want to create a WebP
 		);
 
 		// Check for matching recipes
@@ -152,6 +153,15 @@
 
 	$param = processParams($_GET['param'], $settings['image']);
 
+	// Decide on WebP: extract and save image's file path from which we want to create a WebP
+	if (substr_compare($param->file, '.webp', -5) === 0) {
+		if (!file_exists(WORKSPACE . '/' . $param->file)) {
+			$param->to_webp = substr($param->file, 0, -5);
+		}
+	}
+	// Save truthy state of creating a WebP for later logic
+	$create_webp = $param->to_webp !== '';
+
 	// If the background has been set, ensure that it's not mistakenly
 	// a folder. This is rare edge case in that if a folder is named like
 	// a hexcode, JIT will interpret it as the background colour instead of
@@ -178,7 +188,7 @@
 			Symphony::Log()->pushToLog("{$errno} - ".strip_tags((is_object($errstr) ? $errstr->generate() : $errstr)).($errfile ? " in file {$errfile}" : '') . ($errline ? " on line {$errline}" : ''), $errno, true);
 			Symphony::Log()->pushToLog(
 				sprintf(
-					'Image class param dump - mode: %d, width: %d, height: %d, position: %d, background: %d, file: %s, external: %d, raw input: %s',
+					'Image class param dump - mode: %d, width: %d, height: %d, position: %d, background: %d, file: %s, external: %d, to_webp: %s, raw input: %s',
 					$param->mode,
 					$param->width,
 					$param->height,
@@ -186,6 +196,7 @@
 					$param->background,
 					$param->file,
 					(bool)$param->external,
+					$param->to_webp,
 					General::sanitize($_GET['param'])
 				), E_NOTICE, true
 			);
@@ -194,6 +205,12 @@
 
 	$meta = $cache_file = NULL;
 	$image_path = ($param->external === true ? "http://{$param->file}" : WORKSPACE . "/{$param->file}");
+	
+	// $param->file is fictional when requesting a WebP on the fly,
+	// set $image_path to point to the source file
+	if ($create_webp && !$param->external) {
+		$image_path = WORKSPACE . "/{$param->to_webp}";
+	}
 
 	// If the image is not external check to see when the image was last modified
 	if($param->external !== true){
@@ -299,18 +316,24 @@
 	// still need to know which file is supposed to be processed.
 	$original_file = $image_path;
 
+	// Valid cache file exists
+	$cache_file_exists = false;
+
 	// If CACHING is enabled, check to see that the cached file is still valid.
 	if(CACHING === true){
-		$cache_file = sprintf('%s/%s_%s', CACHE, md5($_REQUEST['param'] . intval($settings['image']['quality'])), basename($image_path));
+		$cache_file = sprintf('%s/%s_%s', CACHE, md5($_REQUEST['param'] . intval($settings['image']['quality'])), basename($param->file));
+		$cache_file_exists = is_file($cache_file);
 
 		// Cache has expired or doesn't exist
-		if(is_file($cache_file) && (filemtime($cache_file) < $last_modified)){
+		if($cache_file_exists && (filemtime($cache_file) < $last_modified)){
 			unlink($cache_file);
+			$cache_file_exists = false;
 		}
-		else if(is_file($cache_file)) {
+		else if($cache_file_exists) {
 			$image_path = $cache_file;
 			touch($cache_file);
 			$param->mode = MODE_NONE;
+			$cache_file_exists = true;
 		}
 	}
 
@@ -330,10 +353,15 @@
 			echo sprintf('Image <code>%s</code> could not be found.', $safeOriginalFile);
 			exit;
 		}
-		$meta = Image::getMetaInformation($image_path);
-		Image::renderOutputHeaders($meta->type);
-		readfile($image_path);
-		exit;
+
+		// Skip this option when reached with an on the fly WebP demand but no
+		// WebP created/cached yet, we create a WebP in the later steps 
+		if (!$create_webp || ($create_webp && CACHING && $cache_file_exists)) {
+			$meta = Image::getMetaInformation($image_path);
+			Image::renderOutputHeaders($meta->type);
+			readfile($image_path);
+			exit;
+		}
 	}
 
 	// There is mode, or the image to JIT is external, so call `Image::load` or
@@ -362,6 +390,10 @@
 	} else {
 		$dst_w = $param->width;
 		$dst_h = $param->height;
+	}
+	if ($param->mode == MODE_NONE && $create_webp) {
+		$dst_w = $src_w;
+		$dst_h = $src_h;
 	}
 
 	// Make sure we have a valid size
@@ -446,8 +478,12 @@
 	// If CACHING is enabled, and a cache file doesn't already exist,
 	// save the JIT image to CACHE using the Quality setting from Symphony's
 	// Configuration.
-	if(CACHING && !is_file($cache_file)){
-		if(!$image->save($cache_file, intval($settings['image']['quality']))) {
+	if(CACHING && !$cache_file_exists){
+		$save = $create_webp
+				? $image->saveWebp($cache_file, intval($settings['image']['quality']))
+				: $image->save($cache_file, intval($settings['image']['quality']));
+
+		if(!$save) {
 			Page::renderStatusCode(Page::HTTP_STATUS_NOT_FOUND);
 			trigger_error('Error generating image', E_USER_ERROR);
 			echo 'Error generating image, failed to create cache file.';
@@ -457,7 +493,11 @@
 
 	// Display the image in the browser using the Quality setting from Symphony's
 	// Configuration. If this fails, trigger an error.
-	if(!$image->display(intval($settings['image']['quality']))) {
+	$display = $create_webp
+				? $image->displayWebp(intval($settings['image']['quality']))
+				: $image->display(intval($settings['image']['quality']));
+
+	if(!$display) {
 		Page::renderStatusCode(Page::HTTP_STATUS_NOT_FOUND);
 		trigger_error('Error generating image', E_USER_ERROR);
 		echo 'Error generating image';

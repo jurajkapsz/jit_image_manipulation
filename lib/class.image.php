@@ -84,7 +84,7 @@
 		 *  The path to the file
 		 * @return Image
 		 */
-		public static function load($image){
+		public static function load($image){			
 			if(!is_file($image) || !is_readable($image)){
 				throw new Exception(sprintf('Error loading image <code>%s</code>. Check it exists and is readable.', str_replace(DOCROOT, '', $image)));
 			}
@@ -372,6 +372,15 @@
 			else return self::__render(NULL, $quality, $interlacing, $output);
 		}
 
+		public function displayWebp($quality = Image::DEFAULT_QUALITY) {
+			self::renderOutputHeaders(IMAGETYPE_WEBP);
+
+			if(isset($this->_image) && is_resource($this->_image)) {
+				return $this->_image;
+			}
+			else return self::__render(NULL, $quality, false, IMAGETYPE_WEBP);
+		}
+
 		/**
 		 * This function will attempt to save an image at a desired destination.
 		 *
@@ -391,6 +400,20 @@
 			if(!$output) $output = $this->Meta()->type; //DEFAULT_OUTPUT_TYPE;
 
 			$this->_image = self::__render($dest, $quality, $interlacing, $output);
+			return $this->_image;
+		}
+
+		/**
+		 * This function will attempt to save an image as a WebP at a desired destination.
+		 *
+		 * @param string $dest
+		 *  The path to save the image at
+		 * @param integer $quality
+		 *  Range of 1-100, if not provided, uses `Image::DEFAULT_QUALITY`
+		 * @return boolean
+		 */
+		public function saveWebp($dest, $quality = Image::DEFAULT_QUALITY) {
+			$this->_image = self::__render($dest, $quality, false, IMAGETYPE_WEBP);
 			return $this->_image;
 		}
 
